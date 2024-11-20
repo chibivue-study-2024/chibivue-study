@@ -4,7 +4,15 @@ const app = createApp({
   render() {
     return h('div', {}, [
       h('p', {}, ['Hello world.']),
-      h('button', {}, ['click me!']),
+      h(
+        'button',
+        {
+          onClick() {
+            alert('Hello world!')
+          },
+        },
+        ['click me!'],
+      ),
     ])
   },
 })
