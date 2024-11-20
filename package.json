@@ -5,12 +5,15 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "cd examples/playground && pnpm i && pnpm run dev"
+    "dev": "cd examples/playground && pnpm i && pnpm run dev",
+    "fmt": "prettier --write --cache .",
+    "fmt:check": "prettier --check --cache ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^20.12.2"
+    "@types/node": "^20.12.2",
+    "prettier": "4.0.0-alpha.10"
   }
 }
