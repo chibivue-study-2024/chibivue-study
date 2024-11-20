@@ -1,6 +1,9 @@
 import { VNode } from './vnode'
 
-export interface RendererOptions<HostNode = RendererNode> {
+export interface RendererOptions<
+  HostNode = RendererNode,
+  HostElement = RendererElement,
+> {
   createElement(type: string): HostNode // 追加
 
   createText(text: string): HostNode // 追加
@@ -8,6 +11,8 @@ export interface RendererOptions<HostNode = RendererNode> {
   setElementText(node: HostNode, text: string): void
 
   insert(child: HostNode, parent: HostNode, anchor?: HostNode | null): void // 追加
+
+  patchProp(el: HostElement, key: string, value: any): void
 }
 export interface RendererNode {
   [key: string]: any
