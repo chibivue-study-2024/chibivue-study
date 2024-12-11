@@ -1,5 +1,6 @@
 // ~/packages/runtime-core apiCreateApp.ts
 
+import { ReactiveEffect } from '../reactivity/effect'
 import { Component } from './component'
 import { RootRenderFunction } from './renderer'
 
@@ -24,7 +25,10 @@ export function createAppAPI<HostElement>(
           render(vnode, rootContainer)
         }
     
-        updateComponent()
+        // ここから
+        const effect = new ReactiveEffect(updateComponent)
+        effect.run()
+        // ここまで
       },
     }
 
