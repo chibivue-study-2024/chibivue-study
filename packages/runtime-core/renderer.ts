@@ -50,6 +50,7 @@ export function createRenderer(options: RendererOptions) {
   }
 
   const render: RootRenderFunction = (vnode, container) => {
+    while (container.firstChild) container.removeChild(container.firstChild) // 全消し処理を追加
     const el = renderVNode(vnode)
     hostInsert(el, container)
   }
