@@ -1,8 +1,9 @@
+import { ComponentInternalInstance } from './component'
 import { RendererNode } from './renderer'
 
 export const Text = Symbol()
 
-export type VNodeTypes = string | typeof Text
+export type VNodeTypes = string | typeof Text | object
 
 export type VNodeNormalizedChildren = string | VNodeArrayChildren
 
@@ -17,6 +18,7 @@ export interface VNode<HostNode = RendererNode> {
   props: VNodeProps | null
   children: VNodeNormalizedChildren
   el: HostNode | undefined
+  component: ComponentInternalInstance | null
 }
 
 export interface VNodeProps {
