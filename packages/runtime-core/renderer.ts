@@ -123,10 +123,8 @@ export function createRenderer(options: RendererOptions) {
     if (type === Text) {
       processText(n1, n2, container)
     } else if (typeof type === 'string') {
-      console.log('patch element')
       processElement(n1, n2, container)
     } else if (typeof type === 'object') {
-      console.log('patch component')
       processComponent(n1, n2, container)
     } else {
       // do nothing
@@ -138,7 +136,6 @@ export function createRenderer(options: RendererOptions) {
     n2: VNode,
     container: RendererElement,
   ) => {
-    console.log('processComponent', { n1 }, { n2 })
     if (n1 == null) {
       mountComponent(n2, container)
     } else {
@@ -201,7 +198,6 @@ export function createRenderer(options: RendererOptions) {
   }
 
   const updateComponent = (n1: VNode, n2: VNode) => {
-    console.log('updateComponent', { n1 }, { n2 })
     const instance = (n2.component = n1.component)!
     instance.next = n2
     instance.update() // 更新のための関数を呼ぶ
