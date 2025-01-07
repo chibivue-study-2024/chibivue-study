@@ -1,6 +1,11 @@
 import { ReactiveEffect } from '../reactivity'
-import { Component } from './component'
-import { normalizeVNode, Text, VNode } from './vnode'
+import {
+  Component,
+  ComponentInternalInstance,
+  createComponentInstance,
+  InternalRenderFunction,
+} from './component'
+import { createVNode, normalizeVNode, Text, VNode } from './vnode'
 
 export interface RendererOptions<
   HostNode = RendererNode,
@@ -15,6 +20,8 @@ export interface RendererOptions<
   insert(child: HostNode, parent: HostNode, anchor?: HostNode | null): void // 追加
 
   patchProp(el: HostElement, key: string, value: any): void
+
+  parentNode(node: HostNode): HostElement // 追加
 }
 export interface RendererNode {
   [key: string]: any
@@ -34,6 +41,7 @@ export function createRenderer(options: RendererOptions) {
     insert: hostInsert,
     patchProp: hostPatchProp,
     setElementText: hostSetText,
+    parentNode: hostParentNode,
   } = options
 
   const processElement = (
@@ -114,25 +122,90 @@ export function createRenderer(options: RendererOptions) {
     const { type } = n2
     if (type === Text) {
       processText(n1, n2, container)
-    } else {
+    } else if (typeof type === 'string') {
       processElement(n1, n2, container)
+    } else if (typeof type === 'object') {
+      processComponent(n1, n2, container)
+    } else {
+      // do nothing
     }
+  }
+
+  const processComponent = (
+    n1: VNode | null,
+    n2: VNode,
+    container: RendererElement,
+  ) => {
+    if (n1 == null) {
+      mountComponent(n2, container)
+    } else {
+      updateComponent(n1, n2)
+    }
+  }
+
+  const mountComponent = (initialVNode: VNode, container: RendererElement) => {
+    const instance: ComponentInternalInstance = (initialVNode.component =
+      createComponentInstance(initialVNode))
+
+    const component = initialVNode.type as Component
+    if (component.setup) {
+      instance.render = component.setup() as InternalRenderFunction
+    }
+
+    setupRenderEffect(instance, initialVNode, container)
+  }
+
+  function setupRenderEffect(
+    instance: ComponentInternalInstance,
+    initialVNode: VNode<RendererNode>,
+    container: RendererElement,
+  ) {
+    const componentUpdateFn = () => {
+      const { render } = instance
+
+      if (!instance.isMounted) {
+        // mount process
+        const subTree = (instance.subTree = normalizeVNode(render()))
+        patch(null, subTree, container)
+        initialVNode.el = subTree.el
+        instance.isMounted = true
+      } else {
+        // patch process
+        let { next, vnode } = instance
+
+        if (next) {
+          // とりあえず，instance 持ってる情報を新しいものに更新してると思えば OK
+          next.el = vnode.el
+          next.component = instance
+          instance.vnode = next
+          instance.next = null
+        } else {
+          next = vnode
+        }
+
+        const prevTree = instance.subTree
+        const nextTree = normalizeVNode(render())
+        instance.subTree = nextTree
+
+        patch(prevTree, nextTree, hostParentNode(prevTree.el!)!) // ※ 1
+        next.el = nextTree.el
+      }
+    }
+
+    const effect = (instance.effect = new ReactiveEffect(componentUpdateFn))
+    const update = (instance.update = () => effect.run()) // instance.updateに登録
+    update()
+  }
+
+  const updateComponent = (n1: VNode, n2: VNode) => {
+    const instance = (n2.component = n1.component)!
+    instance.next = n2
+    instance.update() // 更新のための関数を呼ぶ
   }
 
   const render: RootRenderFunction = (rootComponent, container) => {
-    const componentRender = rootComponent.setup!()
-
-    let n1: VNode | null = null
-
-    const updateComponent = () => {
-      const n2 = componentRender()
-      patch(n1, n2, container)
-      n1 = n2
-    }
-
-    const effect = new ReactiveEffect(updateComponent)
-    effect.run()
+    const vnode = createVNode(rootComponent, {}, [])
+    patch(null, vnode, container)
   }
-
   return { render }
 }
