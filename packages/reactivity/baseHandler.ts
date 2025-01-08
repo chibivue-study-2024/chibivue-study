@@ -4,7 +4,6 @@ import { reactive } from './reactive'
 export const mutableHandlers: ProxyHandler<object> = {
   get(target: object, key: string | symbol, receiver: object) {
     track(target, key)
-    // console.log('track', target, key)
 
     const res = Reflect.get(target, key, receiver)
     // objectの場合はreactiveにしてあげる (これにより、ネストしたオブジェクトもリアクティブにすることができます。)
@@ -19,10 +18,8 @@ export const mutableHandlers: ProxyHandler<object> = {
     let oldValue = (target as any)[key]
     Reflect.set(target, key, value, receiver)
     // 値が変わったかどうかをチェックしてあげておく
-    console.log('track', target, key)
     if (hasChanged(value, oldValue)) {
       trigger(target, key)
-      console.log('changed')
     }
     return true
   },
