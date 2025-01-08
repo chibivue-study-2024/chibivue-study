@@ -5,7 +5,7 @@ import {
   createComponentInstance,
   InternalRenderFunction,
 } from './component'
-import { initProps } from './componentProps'
+import { initProps, updateProps } from './componentProps'
 import { createVNode, normalizeVNode, Text, VNode } from './vnode'
 
 export interface RendererOptions<
@@ -185,6 +185,7 @@ export function createRenderer(options: RendererOptions) {
           next.component = instance
           instance.vnode = next
           instance.next = null
+          updateProps(instance, next.props)
         } else {
           next = vnode
         }

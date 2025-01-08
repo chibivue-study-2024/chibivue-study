@@ -38,3 +38,11 @@ function setFullProps(
     }
   }
 }
+
+export function updateProps(
+  instance: ComponentInternalInstance,
+  rawProps: Data | null,
+) {
+  const { props } = instance
+  Object.assign(props, rawProps)
+}
