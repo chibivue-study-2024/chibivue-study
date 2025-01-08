@@ -14,6 +14,8 @@ export interface ComponentInternalInstance {
   render: InternalRenderFunction // 旧 componentRender
   update: () => void // 旧updateComponent
   isMounted: boolean
+  propsOptions: Record<string, any>
+  props: Record<string, any>
 }
 
 export type InternalRenderFunction = {
@@ -34,6 +36,8 @@ export function createComponentInstance(
     update: null!,
     render: null!,
     isMounted: false,
+    propsOptions: type.props || {},
+    props: {},
   }
 
   return instance

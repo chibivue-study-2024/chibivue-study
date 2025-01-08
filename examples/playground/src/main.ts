@@ -1,29 +1,27 @@
 import { createApp, h, reactive } from 'chibivue'
 
-const CounterComponent = {
-  setup() {
-    const state = reactive({ count: 0 })
-    const increment = () => state.count++
+const MyComponent = {
+  props: { message: { type: String } },
 
-    return () =>
-      h('div', {}, [
-        h('p', {}, [`count: ${state.count}`]),
-        h('button', { onClick: increment }, ['increment']),
-      ])
+  setup(props: { message: string }) {
+    console.log('props', props)
+    return () => h('div', { id: 'my-app' }, [`message: ${props.message}`])
   },
 }
 
 const app = createApp({
   setup() {
-    const state = reactive({ count: 0 })
-    const increment = () => state.count++
+    const state = reactive({ message: 'hello' })
+    const changeMessage = () => {
+      state.message += '!'
+      console.log('state', state)
+    }
+
     return () =>
       h('div', { id: 'my-app' }, [
-        h(CounterComponent, {}, []),
-        h('button', { onClick: increment }, ['root increment']),
-        h('div', {}, [`root count: ${state.count}`]),
+        h(MyComponent, { message: state.message }, []),
+        h('button', { onClick: changeMessage }, ['change message']),
       ])
   },
 })
-
 app.mount('#app')
