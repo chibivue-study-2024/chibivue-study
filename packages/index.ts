@@ -4,6 +4,7 @@ import * as runtimeDom from './runtime-dom'
 
 function compileToFunction(template: string): InternalRenderFunction {
   const code = compile(template)
+  console.log({ runtimeDom })
   return new Function('ChibiVue', code)(runtimeDom)
 }
 
