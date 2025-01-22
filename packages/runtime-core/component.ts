@@ -1,9 +1,16 @@
 import { ReactiveEffect } from '../reactivity'
 import { ComponentOptions } from './componentOptions'
 import { RendererElement } from './renderer'
+import { emit } from './componentEmits'
 import { normalizeVNode, VNode, VNodeChild } from './vnode'
 
 export type Component = ComponentOptions
+type CompileFunction = (template: string) => InternalRenderFunction
+let compile: CompileFunction | undefined
+
+export function registerRuntimeCompiler(_compile: any) {
+  compile = _compile
+}
 
 export interface ComponentInternalInstance {
   type: Component // 元となるユーザー定義のコンポーネント (旧 rootComponent (実際にはルートコンポーネントだけじゃないけど))
@@ -16,6 +23,7 @@ export interface ComponentInternalInstance {
   isMounted: boolean
   propsOptions: Record<string, any>
   props: Record<string, any>
+  emit: (event: string, ...args: any[]) => void
 }
 
 export type InternalRenderFunction = {
@@ -38,7 +46,9 @@ export function createComponentInstance(
     isMounted: false,
     propsOptions: type.props || {},
     props: {},
+    emit: null!,
   }
 
+  instance.emit = emit.bind(null, instance)
   return instance
 }
