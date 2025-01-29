@@ -1,16 +1,30 @@
+import { TemplateChildNode } from './ast'
+
+export interface ParserContext {
+  // 元々のテンプレート文字列
+  readonly originalSource: string
+  source: string
+  // このパーサが読み取っている現在地
+  offset: number
+  line: number
+  column: number
+}
+
+function createParserContext(content: string): ParserContext {
+  return {
+    originalSource: content,
+    source: content,
+    column: 1,
+    line: 1,
+    offset: 0,
+  }
+}
+
 export const baseParse = (
   content: string,
-): { tag: string; props: Record<string, string>; textContent: string } => {
-  const matched = content.match(/<(\w+)\s+([^>]*)>([^<]*)<\/\1>/)
-  if (!matched) return { tag: '', props: {}, textContent: '' }
+): { children: TemplateChildNode[] } => {
+  const context = createParserContext(content) // contextを生成
 
-  const [_, tag, attrs, textContent] = matched
-
-  const props: Record<string, string> = {}
-  attrs.replace(/(\w+)=["']([^"']*)["']/g, (_, key: string, value: string) => {
-    props[key] = value
-    return ''
-  })
-
-  return { tag, props, textContent }
+  // TODO:
+  return { children: [] }
 }
