@@ -3,6 +3,7 @@ import { ComponentOptions } from './componentOptions'
 import { RendererElement } from './renderer'
 import { emit } from './componentEmits'
 import { normalizeVNode, VNode, VNodeChild } from './vnode'
+import { initProps } from './componentProps'
 
 export type Component = ComponentOptions
 type CompileFunction = (template: string) => InternalRenderFunction
@@ -51,4 +52,24 @@ export function createComponentInstance(
 
   instance.emit = emit.bind(null, instance)
   return instance
+}
+
+export const setupComponent = (instance: ComponentInternalInstance) => {
+  const { props } = instance.vnode
+  initProps(instance, props)
+
+  const component = instance.type as Component
+  if (component.setup) {
+    instance.render = component.setup(instance.props, {
+      emit: instance.emit,
+    }) as InternalRenderFunction
+  }
+
+  // ------------------------ ここ
+  if (compile && !component.render) {
+    const template = component.template ?? ''
+    if (template) {
+      instance.render = compile(template)
+    }
+  }
 }
