@@ -3,10 +3,9 @@ import {
   Component,
   ComponentInternalInstance,
   createComponentInstance,
-  InternalRenderFunction,
   setupComponent,
 } from './component'
-import { initProps, updateProps } from './componentProps'
+import { updateProps } from './componentProps'
 import { createVNode, normalizeVNode, Text, VNode } from './vnode'
 
 export interface RendererOptions<
