@@ -2,10 +2,9 @@ import { baseCompile, baseParse } from '../compiler-core'
 import { CompilerOptions } from '../compiler-core/options'
 
 export function compile(template: string, option?: CompilerOptions) {
-  const defaultOptions: Required<CompilerOptions> = {
-    isBrowser: true,
-  }
-  return baseCompile(template, defaultOptions)
+  const defaultOption: Required<CompilerOptions> = { isBrowser: true }
+  if (option) Object.assign(defaultOption, option)
+  return baseCompile(template, defaultOption)
 }
 
 export function parse(template: string) {
