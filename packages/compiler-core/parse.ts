@@ -1,18 +1,20 @@
 import {
-  AttributeNode,
-  ElementNode,
+  type AttributeNode,
+  type DirectiveNode,
+  type ElementNode,
+  type InterpolationNode,
   NodeTypes,
-  Position,
-  SourceLocation,
-  TemplateChildNode,
-  TextNode,
+  type Position,
+  type SourceLocation,
+  type TemplateChildNode,
+  type TextNode,
 } from './ast'
 
 export interface ParserContext {
-  // 元々のテンプレート文字列
   readonly originalSource: string
+
   source: string
-  // このパーサが読み取っている現在地
+
   offset: number
   line: number
   column: number
@@ -32,15 +34,12 @@ export const baseParse = (
   content: string,
 ): { children: TemplateChildNode[] } => {
   const context = createParserContext(content)
-  const children = parseChildren(context, []) // 子ノードをパースする
+  const children = parseChildren(context, [])
   return { children: children }
 }
 
 function parseChildren(
   context: ParserContext,
-
-  // HTMLは再起的な構造を持っているので、祖先要素をスタックとして持っておいて、子にネストして行くたびにpushしていきます。
-  // endタグを見つけるとparseChildrenが終了してancestorsをpopする感じです。
   ancestors: ElementNode[],
 ): TemplateChildNode[] {
   const nodes: TemplateChildNode[] = []
@@ -48,17 +47,16 @@ function parseChildren(
   while (!isEnd(context, ancestors)) {
     const s = context.source
     let node: TemplateChildNode | undefined = undefined
-
-    if (s[0] === '<') {
-      // sが"<"で始まり、かつ次の文字がアルファベットの場合は要素としてパースします。
+    if (startsWith(s, '{{')) {
+      node = parseInterpolation(context)
+    } else if (s[0] === '<') {
       if (/[a-z]/i.test(s[1])) {
-        node = parseElement(context, ancestors) // TODO: これから実装します。
+        node = parseElement(context, ancestors)
       }
     }
 
     if (!node) {
-      // 上記の条件に当てはまらなかった場合はTextNodeとしてパースします。
-      node = parseText(context) // TODO: これから実装します。
+      node = parseText(context)
     }
 
     pushNode(nodes, node)
@@ -67,128 +65,12 @@ function parseChildren(
   return nodes
 }
 
-// 子要素パースの while を判定(パース終了)するための関数
-function isEnd(context: ParserContext, ancestors: ElementNode[]): boolean {
-  const s = context.source
-
-  // sが"</"で始まり、かつその後にancestorsのタグ名が続くことを判定し、閉じタグがあるか(parseChildrenが終了するべきか)を判定します。
-  if (startsWith(s, '</')) {
-    for (let i = ancestors.length - 1; i >= 0; --i) {
-      if (startsWithEndTagOpen(s, ancestors[i].tag)) {
-        return true
-      }
-    }
-  }
-
-  return !s
-}
-
-function startsWith(source: string, searchString: string): boolean {
-  return source.startsWith(searchString)
-}
-
-function pushNode(nodes: TemplateChildNode[], node: TemplateChildNode): void {
-  // nodeTypeがTextのものが連続している場合は結合してあげます
-  if (node.type === NodeTypes.TEXT) {
-    const prev = last(nodes)
-    if (prev && prev.type === NodeTypes.TEXT) {
-      prev.content += node.content
-      return
-    }
-  }
-
-  nodes.push(node)
-}
-
-function last<T>(xs: T[]): T | undefined {
-  return xs[xs.length - 1]
-}
-
-function startsWithEndTagOpen(source: string, tag: string): boolean {
-  return (
-    startsWith(source, '</') &&
-    source.slice(2, 2 + tag.length).toLowerCase() === tag.toLowerCase() &&
-    /[\t\r\n\f />]/.test(source[2 + tag.length] || '>')
-  )
-}
-
-const enum TagType {
-  Start,
-  End,
-}
-
-function parseElement(
-  context: ParserContext,
-  ancestors: ElementNode[],
-): ElementNode | undefined {
-  // Start tag.
-  const element = parseTag(context, TagType.Start) // TODO:
-
-  // <img /> のような self closing の要素の場合にはここで終了です。( children も end タグもないので)
-  if (element.isSelfClosing) {
-    return element
-  }
-
-  // Children.
-  ancestors.push(element)
-  const children = parseChildren(context, ancestors)
-  ancestors.pop()
-
-  element.children = children
-
-  // End tag.
-  if (startsWithEndTagOpen(context.source, element.tag)) {
-    parseTag(context, TagType.End) // TODO:
-  }
-
-  return element
-}
-
-function parseText(context: ParserContext): TextNode {
-  // "<" (タグの開始(開始タグ終了タグ問わず))まで読み進め、何文字読んだかを元にTextデータの終了時点のindexを算出します。
-  const endToken = '<'
-  let endIndex = context.source.length
-  const index = context.source.indexOf(endToken, 1)
-  if (index !== -1 && endIndex > index) {
-    endIndex = index
-  }
-
-  const start = getCursor(context) // これは loc 用
-
-  // endIndexの情報を元に Text データをパースします。
-  const content = parseTextData(context, endIndex)
-
-  return {
-    type: NodeTypes.TEXT,
-    content,
-    loc: getSelection(context, start),
-  }
-}
-
-// content と length を元に text を抽出します。
-function parseTextData(context: ParserContext, length: number): string {
-  const rawText = context.source.slice(0, length)
-  advanceBy(context, length)
-  return rawText
-}
-
-// -------------------- 以下からはユーティリティです。(parseElementなどでも使う) --------------------
-
 function advanceBy(context: ParserContext, numberOfCharacters: number): void {
   const { source } = context
   advancePositionWithMutation(context, source, numberOfCharacters)
   context.source = source.slice(numberOfCharacters)
 }
 
-function advanceSpaces(context: ParserContext): void {
-  const match = /^[\t\r\n\f ]+/.exec(context.source)
-  if (match) {
-    advanceBy(context, match[0].length)
-  }
-}
-
-// 少し長いですが、やっていることは単純で、 pos の計算を行っています。
-// 引数でもらった pos のオブジェクトを破壊的に更新しています。
 function advancePositionWithMutation(
   pos: Position,
   source: string,
@@ -213,22 +95,128 @@ function advancePositionWithMutation(
   return pos
 }
 
-function getCursor(context: ParserContext): Position {
-  const { column, line, offset } = context
-  return { column, line, offset }
+function isEnd(context: ParserContext, ancestors: ElementNode[]): boolean {
+  const s = context.source
+
+  if (startsWith(s, '</')) {
+    for (let i = ancestors.length - 1; i >= 0; --i) {
+      if (startsWithEndTagOpen(s, ancestors[i].tag)) {
+        return true
+      }
+    }
+  }
+
+  return !s
 }
 
-function getSelection(
-  context: ParserContext,
-  start: Position,
-  end?: Position,
-): SourceLocation {
-  end = end || getCursor(context)
-  return {
-    start,
-    end,
-    source: context.originalSource.slice(start.offset, end.offset),
+function startsWith(source: string, searchString: string): boolean {
+  return source.startsWith(searchString)
+}
+
+function advanceSpaces(context: ParserContext): void {
+  const match = /^[\t\r\n\f ]+/.exec(context.source)
+  if (match) {
+    advanceBy(context, match[0].length)
   }
+}
+
+function pushNode(nodes: TemplateChildNode[], node: TemplateChildNode): void {
+  if (node.type === NodeTypes.TEXT) {
+    const prev = last(nodes)
+    if (prev && prev.type === NodeTypes.TEXT) {
+      prev.content += node.content
+      return
+    }
+  }
+
+  nodes.push(node)
+}
+function parseInterpolation(
+  context: ParserContext,
+): InterpolationNode | undefined {
+  const [open, close] = ['{{', '}}']
+  const closeIndex = context.source.indexOf(close, open.length)
+  if (closeIndex === -1) return undefined
+
+  const start = getCursor(context)
+  advanceBy(context, open.length)
+
+  const innerStart = getCursor(context)
+  const innerEnd = getCursor(context)
+  const rawContentLength = closeIndex - open.length
+  const rawContent = context.source.slice(0, rawContentLength)
+  const preTrimContent = parseTextData(context, rawContentLength)
+
+  const content = preTrimContent.trim()
+
+  const startOffset = preTrimContent.indexOf(content)
+
+  if (startOffset > 0) {
+    advancePositionWithMutation(innerStart, rawContent, startOffset)
+  }
+  const endOffset =
+    rawContentLength - (preTrimContent.length - content.length - startOffset)
+  advancePositionWithMutation(innerEnd, rawContent, endOffset)
+  advanceBy(context, close.length)
+
+  return {
+    type: NodeTypes.INTERPOLATION,
+    content,
+    loc: getSelection(context, start),
+  }
+}
+
+function parseText(context: ParserContext): TextNode {
+  const endTokens = ['<', '{{']
+
+  let endIndex = context.source.length
+
+  for (let i = 0; i < endTokens.length; i++) {
+    const index = context.source.indexOf(endTokens[i], 1)
+    if (index !== -1 && endIndex > index) {
+      endIndex = index
+    }
+  }
+
+  const start = getCursor(context)
+  const content = parseTextData(context, endIndex)
+
+  return {
+    type: NodeTypes.TEXT,
+    content,
+    loc: getSelection(context, start),
+  }
+}
+
+const enum TagType {
+  Start,
+  End,
+}
+
+function parseElement(
+  context: ParserContext,
+  ancestors: ElementNode[],
+): ElementNode | undefined {
+  // Start tag.
+  const element = parseTag(context, TagType.Start) // TODO:
+
+  if (element.isSelfClosing) {
+    return element
+  }
+
+  // Children.
+  ancestors.push(element)
+  const children = parseChildren(context, ancestors)
+  ancestors.pop()
+
+  element.children = children
+
+  // End tag.
+  if (startsWithEndTagOpen(context.source, element.tag)) {
+    parseTag(context, TagType.End) // TODO:
+  }
+
+  return element
 }
 
 function parseTag(context: ParserContext, type: TagType): ElementNode {
@@ -246,7 +234,6 @@ function parseTag(context: ParserContext, type: TagType): ElementNode {
   // Tag close.
   let isSelfClosing = false
 
-  // 属性まで読み進めた時点で、次が "/>" だった場合は SelfClosing とする
   isSelfClosing = startsWith(context.source, '/>')
   advanceBy(context, isSelfClosing ? 2 : 1)
 
@@ -260,16 +247,12 @@ function parseTag(context: ParserContext, type: TagType): ElementNode {
   }
 }
 
-// 属性全体(複数属性)のパース
-// eg. `id="app" class="container" style="color: red"`
 function parseAttributes(
   context: ParserContext,
   type: TagType,
-): AttributeNode[] {
+): (AttributeNode | DirectiveNode)[] {
   const props = []
   const attributeNames = new Set<string>()
-
-  // タグが終わるまで読み続ける
   while (
     context.source.length > 0 &&
     !startsWith(context.source, '>') &&
@@ -281,9 +264,8 @@ function parseAttributes(
       props.push(attr)
     }
 
-    advanceSpaces(context) // スペースは読み飛ばす
+    advanceSpaces(context)
   }
-
   return props
 }
 
@@ -294,12 +276,10 @@ type AttributeValue =
     }
   | undefined
 
-// 属性一つのパース
-// eg. `id="app"`
 function parseAttribute(
   context: ParserContext,
   nameSet: Set<string>,
-): AttributeNode {
+): AttributeNode | DirectiveNode {
   // Name.
   const start = getCursor(context)
   const match = /^[^\t\r\n\f />][^\t\r\n\f />=]*/.exec(context.source)!
@@ -319,7 +299,28 @@ function parseAttribute(
     value = parseAttributeValue(context)
   }
 
+  // directive
   const loc = getSelection(context, start)
+  if (/^(v-[A-Za-z0-9-]|@)/.test(name)) {
+    const match =
+      /(?:^v-([a-z0-9-]+))?(?:(?::|^\.|^@|^#)(\[[^\]]+\]|[^\.]+))?(.+)?$/i.exec(
+        name,
+      )!
+
+    let dirName = match[1] || (startsWith(name, '@') ? 'on' : '')
+
+    let arg = ''
+
+    if (match[2]) arg = match[2]
+
+    return {
+      type: NodeTypes.DIRECTIVE,
+      name: dirName,
+      exp: value?.content ?? '',
+      loc,
+      arg,
+    }
+  }
 
   return {
     type: NodeTypes.ATTRIBUTE,
@@ -333,9 +334,6 @@ function parseAttribute(
   }
 }
 
-// 属性のvalueをパース
-// valueのクォートはシングルでもダブルでもパースできるように実装しています。
-// これも頑張ってクォートで囲まれたvalueを取り出したりしているだけです。
 function parseAttributeValue(context: ParserContext): AttributeValue {
   const start = getCursor(context)
   let content: string
@@ -363,4 +361,40 @@ function parseAttributeValue(context: ParserContext): AttributeValue {
   }
 
   return { content, loc: getSelection(context, start) }
+}
+
+function parseTextData(context: ParserContext, length: number): string {
+  const rawText = context.source.slice(0, length)
+  advanceBy(context, length)
+  return rawText
+}
+
+function getCursor(context: ParserContext): Position {
+  const { column, line, offset } = context
+  return { column, line, offset }
+}
+
+function getSelection(
+  context: ParserContext,
+  start: Position,
+  end?: Position,
+): SourceLocation {
+  end = end || getCursor(context)
+  return {
+    start,
+    end,
+    source: context.originalSource.slice(start.offset, end.offset),
+  }
+}
+
+function last<T>(xs: T[]): T | undefined {
+  return xs[xs.length - 1]
+}
+
+function startsWithEndTagOpen(source: string, tag: string): boolean {
+  return (
+    startsWith(source, '</') &&
+    source.slice(2, 2 + tag.length).toLowerCase() === tag.toLowerCase() &&
+    /[\t\r\n\f />]/.test(source[2 + tag.length] || '>')
+  )
 }
