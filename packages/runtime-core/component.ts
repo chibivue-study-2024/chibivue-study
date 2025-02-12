@@ -9,6 +9,8 @@ export type Component = ComponentOptions
 type CompileFunction = (template: string) => InternalRenderFunction
 let compile: CompileFunction | undefined
 
+export type Data = Record<string, unknown>
+
 export function registerRuntimeCompiler(_compile: any) {
   compile = _compile
 }
@@ -25,10 +27,11 @@ export interface ComponentInternalInstance {
   propsOptions: Record<string, any>
   props: Record<string, any>
   emit: (event: string, ...args: any[]) => void
+  setupState: Data // setup の結果はオブジェクトの場合はここに格納することにする
 }
 
 export type InternalRenderFunction = {
-  (): VNodeChild
+  (ctx: Data): VNodeChild
 }
 
 export function createComponentInstance(
@@ -60,9 +63,18 @@ export const setupComponent = (instance: ComponentInternalInstance) => {
 
   const component = instance.type as Component
   if (component.setup) {
-    instance.render = component.setup(instance.props, {
+    const setupResult = component.setup(instance.props, {
       emit: instance.emit,
     }) as InternalRenderFunction
+
+    // setupResultの型によって分岐をする
+    if (typeof setupResult === 'function') {
+      instance.render = setupResult
+    } else if (typeof setupResult === 'object' && setupResult !== null) {
+      instance.setupState = setupResult
+    } else {
+      // do nothing
+    }
   }
 
   // ------------------------ ここ
