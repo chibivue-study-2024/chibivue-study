@@ -15,5 +15,8 @@
   "devDependencies": {
     "@types/node": "^20.12.2",
     "prettier": "4.0.0-alpha.10"
+  },
+  "dependencies": {
+    "vite": "^6.1.0"
   }
 }
